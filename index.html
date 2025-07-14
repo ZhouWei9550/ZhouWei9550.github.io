@@ -233,7 +233,7 @@ const APP_KEY = "iYAIytyAuqiva847r6W0aHNF"; // 替换为你的APP_KEY
 AV.init({
   appId: APP_ID,
   appKey: APP_KEY,
-  serverURL: "q2Y2L4UouhJ7yFiar7Wbbkrg-gzGzoHsz.api.lncld.cn" // 替换为你的API访问域名
+  serverURL: "https://q2Y2L4UouhJ7yFiar7Wbbkrg.api.lncld.cn" // 使用APP_ID前缀完整子域名
 });
 
 // 创建Tasks数据表引用
@@ -261,25 +261,44 @@ function loadTasks() {
 
 // 保存任务到LeanCloud
 function saveTasks() {
-  // 先删除所有现有任务
-  const deleteQuery = new AV.Query('Task');
-  deleteQuery.find().then(results => {
-    return AV.Object.destroyAll(results);
-  }).then(() => {
-    // 批量保存新任务
-    const taskObjects = tasks.map(task => {
-      const taskObj = new Task();
-      // 排除id字段，由LeanCloud自动生成
-      const { id, ...taskData } = task;
-      return taskObj.save(taskData);
-    });
-    return Promise.all(taskObjects);
-  }).then(() => {
-    console.log('所有任务已保存到LeanCloud');
-  }).catch(error => {
-    console.error('保存任务失败:', error);
-    alert('保存数据失败，请重试');
+  // 获取现有任务ID集合
+  const existingTaskIds = tasks.filter(task => task.id).map(task => task.id);
+  
+  // 分离新增任务和更新任务
+  const newTasks = tasks.filter(task => !task.id);
+  const updateTasks = tasks.filter(task => task.id);
+  
+  // 批量处理更新
+  const updatePromises = updateTasks.map(task => {
+    const taskObj = AV.Object.createWithoutData('Task', task.id);
+    const { id, ...taskData } = task;
+    return taskObj.save(taskData);
   });
+  
+  // 批量处理新增
+  const createPromises = newTasks.map(task => {
+    const taskObj = new Task();
+    const { id, ...taskData } = task;
+    return taskObj.save(taskData);
+  });
+  
+  // 执行所有操作
+  Promise.all([...updatePromises, ...createPromises])
+    .then(results => {
+      console.log('任务保存成功:', results);
+      // 更新本地任务ID
+      results.forEach((result, index) => {
+        if (index < updateTasks.length) {
+          updateTasks[index].id = result.id;
+        } else {
+          newTasks[index - updateTasks.length].id = result.id;
+        }
+      });
+    })
+    .catch(error => {
+      console.error('保存任务失败:', error);
+      alert(`保存失败: ${error.message || '网络错误，请检查连接'}`);
+    });
 }
 
 // 存储作业数据的数组
