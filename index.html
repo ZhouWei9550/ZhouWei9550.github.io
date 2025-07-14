@@ -7,6 +7,8 @@
     <title>作业日程管理系统</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 添加LeanCloud SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.12.0/dist/av-min.js"></script>
     <style>
 /* 自定义样式 */
 body {
@@ -225,29 +227,85 @@ button:disabled {
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script>
-// 存储作业数据的数组
-let tasks = (JSON.parse(localStorage.getItem('workTasks')) || []).map(task => {
-    let persons = [];
-    if (typeof task.taskPersons === 'string') {
-        persons = task.taskPersons.replace(/[，、;；:：\s]+/g, ',').split(',').filter(p => p.trim()).map(p => p.trim());
-    } else if (Array.isArray(task.taskPersons)) {
-        // 处理数组中可能存在的复合姓名
-        persons = task.taskPersons.flatMap(p => 
-            p.replace(/[，、;；:：\s]+/g, ',').split(',').filter(name => name.trim()).map(name => name.trim())
-        );
-    }
-    return {
-        ...task,
-        taskPersons: persons
-    };
+// 初始化LeanCloud
+const APP_ID = "q2Y2L4UouhJ7yFiar7Wbbkrg-gzGzoHsz"; // 替换为你的APP_ID
+const APP_KEY = "iYAIytyAuqiva847r6W0aHNF"; // 替换为你的APP_KEY
+AV.init({
+  appId: APP_ID,
+  appKey: APP_KEY,
+  serverURL: "https://q2y2l4uo.lc-cn-n1-shared.com" // 替换为你的API访问域名
 });
+
+// 创建Tasks数据表引用
+const Task = AV.Object.extend('Task');
+const query = new AV.Query('Task');
+
+// 存储作业数据的数组
+let tasks = [];
+
+// 从LeanCloud加载任务
+function loadTasks() {
+  query.find().then(results => {
+    tasks = results.map(result => ({
+      id: result.id,
+      ...result.attributes
+    }));
+    console.log('从LeanCloud加载的任务:', tasks);
+    renderTasks();
+    updateDriverStatus();
+  }).catch(error => {
+    console.error('加载任务失败:', error);
+    alert('加载数据失败，请刷新页面重试');
+  });
+}
+
+// 保存任务到LeanCloud
+function saveTasks() {
+  // 先删除所有现有任务
+  const deleteQuery = new AV.Query('Task');
+  deleteQuery.find().then(results => {
+    return AV.Object.destroyAll(results);
+  }).then(() => {
+    // 批量保存新任务
+    const taskObjects = tasks.map(task => {
+      const taskObj = new Task();
+      // 排除id字段，由LeanCloud自动生成
+      const { id, ...taskData } = task;
+      return taskObj.save(taskData);
+    });
+    return Promise.all(taskObjects);
+  }).then(() => {
+    console.log('所有任务已保存到LeanCloud');
+  }).catch(error => {
+    console.error('保存任务失败:', error);
+    alert('保存数据失败，请重试');
+  });
+}
+
+// 存储作业数据的数组
+// 从LeanCloud加载任务而不是localStorage
+// let tasks = (JSON.parse(localStorage.getItem('workTasks')) || []).map(task => {
+//     let persons = [];
+//     if (typeof task.taskPersons === 'string') {
+//         persons = task.taskPersons.replace(/[，、;；:：\s]+/g, ',').split(',').filter(p => p.trim()).map(p => p.trim());
+//     } else if (Array.isArray(task.taskPersons)) {
+//         // 处理数组中可能存在的复合姓名
+//         persons = task.taskPersons.flatMap(p => 
+//             p.replace(/[，、;；:：\s]+/g, ',').split(',').filter(name => name.trim()).map(name => name.trim())
+//         );
+//     }
+//     return {
+//         ...task,
+//         taskPersons: persons
+//     };
+// });
 console.log('初始加载的任务:', tasks);
 
-// 保存任务到本地存储
-function saveTasks() {
-    console.log('保存任务到本地存储:', tasks);
-    localStorage.setItem('workTasks', JSON.stringify(tasks));
-}
+// 保存任务到本地存储 - 注释掉localStorage相关代码
+// function saveTasks() {
+//     console.log('保存任务到本地存储:', tasks);
+//     localStorage.setItem('workTasks', JSON.stringify(tasks));
+// }
 
 // DOM元素
 const taskForm = document.getElementById('taskForm');
@@ -629,4 +687,9 @@ window.addEventListener('click', (e) => {
 });
 </script>
 </body>
+</html>
+
+// 页面加载时获取数据
+loadTasks();
+</script>
 </html>
