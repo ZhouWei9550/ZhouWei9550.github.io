@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作业日程管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style>
+/* 自定义样式 */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .container {
+        padding: 0.5rem;
+    }
+    
+    h1 {
+        font-size: 1.8rem;
+    }
+    
+    .grid-cols-1 lg:grid-cols-3 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 动画效果 */
+.fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 表格行悬停效果 */
+tr:hover {
+    background-color: #f9fafb;
+}
+
+/* 按钮样式细化 */
+button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">作业日程管理系统</h1>
+<button id="helpBtn" class="bg-blue-500 hover:bg-blue-700 text-white py-2 px-4 rounded mb-4">使用说明</button>
+
+<!-- 使用说明模态框 -->
+<div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+  <div class="bg-white p-6 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold">使用说明</h2>
+      <button id="closeHelpBtn" class="text-gray-500 hover:text-gray-700">&times;</button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <h3 class="font-semibold text-lg">1. 添加作业任务</h3>
+        <ul class="list-disc pl-5 mt-2 space-y-1">
+          <li>填写项目名称、作业内容和作业人员</li>
+          <li>作业人员可使用逗号、顿号、分号或空格分隔多人</li>
+          <li>选择作业日期和时间段（白天/晚上）</li>
+          <li>如需司机，勾选"需要司机"选项</li>
+          <li>点击"添加作业"按钮完成添加</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="font-semibold text-lg">2. 司机安排规则</h3>
+        <ul class="list-disc pl-5 mt-2 space-y-1">
+          <li>司机同一天只能安排一次</li>
+          <li>司机晚上被安排后，第二天白天不可安排</li>
+          <li>系统会自动检测司机冲突并提示</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="font-semibold text-lg">3. 导出Excel表格</h3>
+        <ul class="list-disc pl-5 mt-2 space-y-1">
+          <li>选择要导出的周数</li>
+          <li>点击"导出Excel"按钮生成表格</li>
+          <li>表格将按人员和日期矩阵式展示</li>
+          <li>冲突任务会以红色背景显示</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="font-semibold text-lg">4. 查看司机状态</h3>
+        <p>页面右侧会显示当前司机的安排情况，方便查看调度情况。</p>
+      </div>
+    </div>
+  </div>
+</div>
+            <p class="text-gray-600">高效管理项目作业安排与人员调度</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- 左侧：作业输入区域 -->
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fa fa-plus-circle text-blue-500 mr-2"></i>添加作业安排
+                    </h2>
+                    <form id="taskForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">项目名称</label>
+                            <input type="text" id="projectName" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">作业内容</label>
+                            <textarea id="taskContent" required rows="2"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">作业人员</label>
+                            <input type="text" id="taskPerson" required placeholder="多个人员用逗号分隔"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">日期</label>
+                            <input type="date" id="taskDate" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">时间段</label>
+                            <div class="flex space-x-4">
+                                <label class="inline-flex items-center">
+                                    <input type="radio" name="timeSlot" value="day" required class="form-radio text-blue-500">
+                                    <span class="ml-2">白天</span>
+                                </label>
+                                <label class="inline-flex items-center">
+                                    <input type="radio" name="timeSlot" value="night" class="form-radio text-blue-500">
+                                    <span class="ml-2">晚上</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="needDriver" class="form-checkbox text-blue-500">
+                                <span class="ml-2 text-sm font-medium text-gray-700">需要司机</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md transition duration-200 flex items-center justify-center">
+                            <i class="fa fa-save mr-2"></i>保存作业
+                        </button>
+                    </form>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fa fa-calendar-check-o text-green-500 mr-2"></i>导出日程表
+                    </h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">选择周</label>
+                            <input type="number" id="exportWeek" min="1" max="52" required
+    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <button id="exportBtn" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md transition duration-200 flex items-center justify-center">
+                            <i class="fa fa-download mr-2"></i>导出Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：作业列表和司机状态 -->
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold flex items-center">
+                            <i class="fa fa-list-alt text-purple-500 mr-2"></i>本周作业列表
+                        </h2>
+                        <button id="clearAllBtn" class="text-sm text-red-500 hover:text-red-700 flex items-center">
+                            <i class="fa fa-trash mr-1"></i>清空所有
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">项目</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">作业内容</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">人员</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间段</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">司机</th>
+                                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="taskTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- 作业数据将通过JavaScript动态填充 -->
+                                <tr class="text-center text-gray-500">
+                                    <td colspan="7" class="px-4 py-8">暂无作业数据，请添加作业</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fa fa-car text-yellow-500 mr-2"></i>司机排班状态
+                    </h2>
+                    <div id="driverStatus" class="text-gray-600">
+                        <p>当前没有安排需要司机的作业</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+// 存储作业数据的数组
+let tasks = (JSON.parse(localStorage.getItem('workTasks')) || []).map(task => {
+    let persons = [];
+    if (typeof task.taskPersons === 'string') {
+        persons = task.taskPersons.replace(/[，、;；:：\s]+/g, ',').split(',').filter(p => p.trim()).map(p => p.trim());
+    } else if (Array.isArray(task.taskPersons)) {
+        // 处理数组中可能存在的复合姓名
+        persons = task.taskPersons.flatMap(p => 
+            p.replace(/[，、;；:：\s]+/g, ',').split(',').filter(name => name.trim()).map(name => name.trim())
+        );
+    }
+    return {
+        ...task,
+        taskPersons: persons
+    };
+});
+console.log('初始加载的任务:', tasks);
+
+// 保存任务到本地存储
+function saveTasks() {
+    console.log('保存任务到本地存储:', tasks);
+    localStorage.setItem('workTasks', JSON.stringify(tasks));
+}
+
+// DOM元素
+const taskForm = document.getElementById('taskForm');
+const taskTableBody = document.getElementById('taskTableBody');
+const driverStatus = document.getElementById('driverStatus');
+const exportBtn = document.getElementById('exportBtn');
+// const clearAllBtn = document.getElementById('clearAllBtn');
+const exportWeek = document.getElementById('exportWeek');
+const needDriver = document.getElementById('needDriver');
+
+// 初始化页面
+document.addEventListener('DOMContentLoaded', () => {
+    // 设置默认日期为今天（本地日期）
+function getLocalDateString() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+document.getElementById('taskDate').value = getLocalDateString();
+    
+    // 设置默认周为当前周
+    // 设置默认周为当前周
+const now = new Date();
+const currentWeek = getISOWeek(now);
+    exportWeek.value = currentWeek;
+    
+    renderTasks();
+    updateDriverStatus();
+    
+    // 导出按钮事件监听
+    exportBtn.addEventListener('click', exportSchedule);
+    exportWeek.addEventListener('change', renderTasks);
+});
+
+// 按周筛选任务
+function getTasksByWeek(weekNumber) {
+    return tasks.filter(task => {
+        // 使用本地日期解析，避免时区偏移
+const taskDate = new Date(task.taskDate);
+        const taskWeek = getISOWeek(taskDate);
+const targetWeek = parseInt(weekNumber);
+const isMatch = taskWeek === targetWeek;
+console.log(`任务日期: ${task.taskDate}, 计算周数: ${taskWeek}, 目标周数: ${targetWeek}, 是否匹配: ${isMatch}`);
+return isMatch;
+    });
+}
+
+// 导出日程表为矩阵式Excel（人员x日期）并标记冲突
+function getWeekDates(weekNumber) {
+    const year = new Date().getFullYear();
+    // 使用ISO周计算方法，更可靠地获取指定周的日期
+    const date = new Date(Date.UTC(year, 0, 1 + (weekNumber - 1) * 7));
+    // 调整到周一（ISO周的第一天是周一）
+    const day = date.getUTCDay() || 7; // 将周日的0转换为7
+    date.setUTCDate(date.getUTCDate() + (1 - day));
+    
+    // 生成一周的7天日期
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+        const currentDate = new Date(date);
+        currentDate.setUTCDate(date.getUTCDate() + i);
+        weekDates.push(formatDate(currentDate));
+    }
+    return weekDates;
+}
+
+function exportSchedule() {
+    const weekNumber = exportWeek.value;
+    const weeklyTasks = getTasksByWeek(weekNumber)
+  .flatMap(task => 
+    task.taskPersons.map(person => ({ ...task, taskPersons: [person.trim()] }))
+  );
+    
+    if (weeklyTasks.length === 0) {
+        alert('该周没有作业数据可导出！');
+        return;
+    }
+    
+    // 1. 收集所有唯一人员和日期
+    const persons = [...new Set(weeklyTasks.flatMap(task => task.taskPersons))].sort();
+    const dates = getWeekDates(parseInt(weekNumber));
+    
+    // 2. 准备矩阵数据和冲突跟踪
+    const taskMatrix = {};  // 存储任务内容: taskMatrix[person][date] = [tasks...]
+    const conflictMatrix = {};  // 跟踪冲突: conflictMatrix[person][date] = true/false
+    
+    // 初始化任务矩阵和冲突矩阵 - 确保所有7天日期都显示
+    persons.forEach(person => {
+        taskMatrix[person] = {};
+        conflictMatrix[person] = {};
+        dates.forEach(date => {
+            taskMatrix[person][date] = [];
+            conflictMatrix[person][date] = false;
+        });
+    });
+    
+    // 填充矩阵数据并检测冲突
+    weeklyTasks.forEach(task => {
+        const taskDate = formatDate(task.taskDate);
+        const timeLabel = task.timeSlot === 'day' ? '白天' : '晚上';
+        const taskContent = `${timeLabel}: ${task.projectName}-${task.taskContent}`;
+        
+        task.taskPersons.forEach(person => {
+            taskMatrix[person][taskDate].push(taskContent);
+            // 如果同一人同一天有多个任务，标记为冲突
+            if (taskMatrix[person][taskDate].length > 1) {
+                conflictMatrix[person][taskDate] = true;
+            }
+        });
+    });
+    
+    // 3. 构建Excel数据数组
+    const excelData = [['人员/日期', ...dates]];  // 标题行
+    
+    persons.forEach(person => {
+        const row = [person];
+        dates.forEach(date => {
+            // 合并同一天的多个任务，用换行符分隔
+            row.push(taskMatrix[person][date].join('\n'));
+        });
+        excelData.push(row);
+    });
+    
+    // 4. 创建工作簿和工作表
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(excelData);
+    
+    // 5. 设置单元格样式（冲突项标红）
+    const redFill = { fgColor: { rgb: "FFFF0000" } };
+    const whiteFont = { color: { rgb: "FFFFFFFF" } };
+    
+    persons.forEach((person, rowIdx) => {
+        dates.forEach((date, colIdx) => {
+            if (conflictMatrix[person][date]) {
+                // 计算单元格坐标 (行从1开始，列从1开始)
+                const cellAddress = XLSX.utils.encode_cell({ r: rowIdx + 1, c: colIdx + 1 });
+                if (ws[cellAddress]) {
+                    ws[cellAddress].s = { fill: redFill, font: whiteFont };
+                }
+            }
+        });
+    });
+    
+    // 6. 设置列宽
+    ws['!cols'] = [
+        { wch: 12 },  // 人员列
+        ...dates.map(() => ({ wch: 25 }))  // 日期列
+    ];
+
+    // 设置行高
+    ws['!rows'] = excelData.map(row => {
+        const maxLines = Math.max(...row.map(cell => (cell || '').split('\n').length));
+        return { hpx: 20 * maxLines }; // 基础行高20px，乘以行数
+    });
+
+    // 7. 添加工作表并导出
+    XLSX.utils.book_append_sheet(wb, ws, `第${weekNumber}周作业`);
+    XLSX.writeFile(wb, `作业日程表_第${weekNumber}周.xlsx`);
+}
+
+// 表单提交事件
+taskForm.addEventListener('submit', (e) => {
+    console.log('表单提交开始');
+    e.preventDefault();
+    
+    // 获取表单数据
+console.log('获取表单数据');
+const projectName = document.getElementById('projectName').value.trim();
+    const taskContent = document.getElementById('taskContent').value.trim();
+    const taskPersons = document.getElementById('taskPerson').value.trim().replace(/[，、;；:：\s]+/g, ',').split(',').filter(p => p.trim()).map(p => p.trim());
+    const taskDate = document.getElementById('taskDate').value;
+    const timeSlot = document.querySelector('input[name="timeSlot"]:checked').value;
+    const taskNeedDriver = needDriver.checked;
+    
+    // 检查司机冲突
+console.log('检查司机冲突:', taskNeedDriver);
+if (taskNeedDriver) {
+        if (!checkDriverAvailability(taskDate, timeSlot)) {
+            alert('司机在该时间段不可用！\n- 司机白天被安排后，当天晚上不可再安排\n- 司机晚上被安排后，第二天白天不可再安排');
+            return;
+        }
+    }
+    
+    // 创建新任务
+console.log('创建新任务，日期:', taskDate);
+console.log('任务数据:', {projectName, taskContent, taskPersons, taskDate, timeSlot, taskNeedDriver});
+const newTask = {
+        id: Date.now().toString(),
+        projectName,
+        taskContent,
+        taskPersons,
+        taskDate,
+        timeSlot,
+        needDriver: taskNeedDriver,
+        createdAt: new Date().toISOString()
+    };
+    
+    // 添加到任务数组并保存
+tasks.push(newTask);
+console.log('任务已添加到数组，当前任务数量:', tasks.length);
+saveTasks();
+    
+    // 重新渲染和更新状态
+console.log('触发重新渲染任务列表');
+renderTasks();
+updateDriverStatus();
+    
+    // 重置表单
+    taskForm.reset();
+    document.getElementById('taskDate').value = getLocalDateString();
+    document.querySelector('input[name="timeSlot"][value="day"]').checked = true;
+    
+    // 显示成功消息
+    alert('作业添加成功！');
+});
+
+// 删除任务
+function deleteTask(taskId) {
+    tasks = tasks.filter(task => task.id !== taskId);
+    saveTasks();
+    renderTasks();
+    updateDriverStatus();
+}
+
+// 获取ISO周数 (ISO 8601标准，周一为一周的第一天)
+function getISOWeek(date) {
+    const tempDate = new Date(date);
+    tempDate.setHours(0, 0, 0, 0);
+    // 周四是ISO周的参考日
+    const day = tempDate.getDay() || 7;
+    tempDate.setDate(tempDate.getDate() + 4 - day);
+    const year = tempDate.getFullYear();
+    const yearStart = new Date(year, 0, 1);
+    const weekNo = Math.ceil((((tempDate - yearStart) / 86400000) + 1) / 7);
+    // 处理跨年周的情况
+    if (weekNo === 53 && new Date(year, 11, 31).getDay() < 4) {
+        return 1;
+    } else if (weekNo === 0) {
+        return getISOWeek(new Date(year - 1, 11, 31));
+    }
+    return weekNo;
+}
+
+// 格式化日期
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+}
+
+// 渲染任务列表
+function renderTasks() {
+    const weekNumber = exportWeek.value;
+    const weeklyTasks = getTasksByWeek(weekNumber);
+    console.log('当前周数:', weekNumber);
+    console.log('筛选后的任务:', weeklyTasks);
+    console.log('所有任务:', tasks);
+    
+    if (weeklyTasks.length === 0) {
+        taskTableBody.innerHTML = `
+            <tr class="text-center text-gray-500">
+                <td colspan="7" class="px-4 py-8">暂无作业数据，请添加作业</td>
+            </tr>
+        `;
+        return;
+    }
+    
+    // 按日期排序任务
+    const sortedTasks = [...weeklyTasks].sort((a, b) => new Date(a.taskDate) - new Date(b.taskDate));
+    
+    taskTableBody.innerHTML = '';
+    sortedTasks.forEach(task => {
+        const row = document.createElement('tr');
+        row.className = 'fade-in';
+        row.innerHTML = `
+              <td class="px-4 py-3 whitespace-nowrap">${task.projectName}</td>
+              <td class="px-4 py-3">${task.taskContent}</td>
+              <td class="px-4 py-3">${task.taskPersons.join(', ')}</td>
+              <td class="px-4 py-3 whitespace-nowrap">${formatDate(task.taskDate)}</td>
+              <td class="px-4 py-3 whitespace-nowrap">${task.timeSlot === 'day' ? '白天' : '晚上'}</td>
+              <td class="px-4 py-3 whitespace-nowrap">${task.needDriver ? '<span class="bg-red-100 text-red-800 px-2 py-1 rounded">需要司机</span>' : '-'}</td>
+              <td class="px-4 py-3 whitespace-nowrap">
+                <button onclick="deleteTask('${task.id}')" class="text-red-500 hover:text-red-700 mr-2">删除</button>
+              </td>
+        `;
+        taskTableBody.appendChild(row);
+    });
+}
+
+// 检查司机可用性
+function checkDriverAvailability(date, timeSlot) {
+    const targetDate = new Date(date);
+    
+    // 检查当天是否有司机安排
+    const hasSameDayDriver = tasks.some(task => {
+        if (!task.needDriver) return false;
+        const taskDate = new Date(task.taskDate);
+        return taskDate.toDateString() === targetDate.toDateString();
+    });
+    
+    if (hasSameDayDriver) return false;
+    
+    // 检查前一天晚上是否有司机安排
+    if (timeSlot === 'day') {
+        const prevDay = new Date(targetDate);
+        prevDay.setDate(targetDate.getDate() - 1);
+        const hasPrevNightDriver = tasks.some(task => {
+            if (!task.needDriver || task.timeSlot !== 'night') return false;
+            const taskDate = new Date(task.taskDate);
+            return taskDate.toDateString() === prevDay.toDateString();
+        });
+        return !hasPrevNightDriver;
+    }
+    
+    return true;
+}
+
+// 更新司机状态
+function updateDriverStatus() {
+    // 获取所有需要司机的任务
+    const driverTasks = tasks.filter(task => task.needDriver);
+    
+    if (driverTasks.length === 0) {
+        driverStatus.innerHTML = '<p>当前没有安排需要司机的作业</p>';
+        return;
+    }
+    
+    // 按日期排序
+    const sortedDriverTasks = [...driverTasks].sort((a, b) => new Date(a.taskDate) - new Date(b.taskDate));
+    
+    let statusHTML = '<ul class="space-y-2">';
+    sortedDriverTasks.forEach(task => {
+        statusHTML += `
+            <li class="flex items-center">
+                <i class="fa fa-calendar-o text-blue-500 mr-2"></i>
+                <span>${formatDate(task.taskDate)} ${task.timeSlot === 'day' ? '白天' : '晚上'}: </span>
+                <span class="ml-2 font-medium">${task.projectName}</span>
+            </li>
+        `;
+    });
+    statusHTML += '</ul>';
+    
+    driverStatus.innerHTML = statusHTML;
+}
+
+// 清空所有任务功能已移除，因为页面中不存在对应的按钮元素
+// clearAllBtn.addEventListener('click', () => {
+//     if (confirm('确定要清空所有作业数据吗？此操作不可恢复！')) {
+//         tasks = [];
+//         saveTasks();
+//         renderTasks();
+//         updateDriverStatus();
+//     }
+// });
+</script>
+<script>
+// 使用说明模态框交互
+const helpModal = document.getElementById('helpModal');
+const helpBtn = document.getElementById('helpBtn');
+const closeHelpBtn = document.getElementById('closeHelpBtn');
+
+// 打开模态框
+helpBtn.addEventListener('click', () => {
+    helpModal.classList.remove('hidden');
+});
+
+// 关闭模态框
+closeHelpBtn.addEventListener('click', () => {
+    helpModal.classList.add('hidden');
+});
+
+// 点击模态框外部关闭
+window.addEventListener('click', (e) => {
+    if (e.target === helpModal) {
+        helpModal.classList.add('hidden');
+    }
+});
+</script>
+</body>
+</html>
